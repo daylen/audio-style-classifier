@@ -4,7 +4,6 @@ import librosa
 import threading
 import random
 import pandas as pd
-import csv
 import os
 
 root_path = "/Users/daylenyang/Downloads/magnatagatune/mp3/"
@@ -97,7 +96,7 @@ def get_data(N):
 	return header, train, val, test, data_dict
 
 class DataManager:
-	def __init__(self, fnames, data_dict, coord, sample_rate, seconds_of_audio, n_classes):
+	def __init__(self, fnames, data_dict, coord, sample_rate, seconds_of_audio, n_classes, queue_capacity):
 		self.fnames = fnames
 		self.data_dict = data_dict
 		self.coord = coord
@@ -105,7 +104,7 @@ class DataManager:
 		self.seconds_of_audio = seconds_of_audio
 		self.x = tf.placeholder(tf.float32, [sample_rate * seconds_of_audio])
 		self.y = tf.placeholder(tf.float32, [n_classes])
-		self.queue = tf.RandomShuffleQueue(500, 50, ['float32', 'float32'], shapes=[self.x.get_shape(), self.y.get_shape()])
+		self.queue = tf.FIFOQueue(queue_capacity, ['float32', 'float32'], shapes=[self.x.get_shape(), self.y.get_shape()])
 		self.enqueue_op = self.queue.enqueue([self.x, self.y])
 
 	def dequeue(self, N):

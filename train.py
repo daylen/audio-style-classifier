@@ -1,10 +1,6 @@
 
-import csv
-import numpy as np
-import pandas as pd
 import tensorflow as tf
 import os
-import time
 from data_manager import DataManager
 from data_manager import get_data
 
@@ -13,7 +9,7 @@ SECONDS_OF_AUDIO = 3
 N_CLASSES = 50
 DROPOUT = 0.75
 BATCH_SIZE = 20
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.1
 PRINT_EVERY = 20
 EVAL_EVERY = 200
 SAVE_DIR = './checkpoints/'
@@ -68,25 +64,27 @@ biases = {
     'out': tf.Variable(tf.random_normal([N_CLASSES]))
 }
 
-coord = tf.train.Coordinator()
-data_man_train = DataManager(train, data_dict, coord, SAMPLE_RATE, SECONDS_OF_AUDIO, N_CLASSES)
-data_man_val = DataManager(val, data_dict, coord, SAMPLE_RATE, SECONDS_OF_AUDIO, N_CLASSES)
 
-x_batch, y_batch = data_man_train.dequeue(BATCH_SIZE)
-x_batch_val, y_batch_val = data_man_val.dequeue(BATCH_SIZE)
-pred = net(x_batch, weights, biases, keep_prob)
-pred_val = net(x_batch_val, weights, biases, keep_prob)
-cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(pred, y_batch))
-cost_val = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(pred_val, y_batch_val))
+coord = tf.train.Coordinator()
+
+def get_end_ops(fname_list):
+    data_man = DataManager(fname_list, data_dict, coord, SAMPLE_RATE, SECONDS_OF_AUDIO, N_CLASSES, 10*BATCH_SIZE)
+    x_batch, y_batch = data_man.dequeue(BATCH_SIZE)
+    pred = net(x_batch, weights, biases, keep_prob)
+    cost = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(pred, y_batch))
+    auc_op = tf.contrib.metrics.streaming_auc(tf.sigmoid(pred), y_batch)
+
+    return data_man, pred, cost, auc_op
+
+data_man_train, pred, cost, auc_op = get_end_ops(train)
+data_man_val, pred_val, cost_val, auc_op_val = get_end_ops(val)
 
 optimizer = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(cost)
-
-auc_op = tf.contrib.metrics.streaming_auc(tf.sigmoid(pred), y_batch)
-auc_op_val = tf.contrib.metrics.streaming_auc(tf.sigmoid(pred_val), y_batch_val)
 
 saver = tf.train.Saver()
 sess = tf.Session()
 sess.run(tf.initialize_all_variables())
+sess.run(tf.initialize_local_variables())
 
 threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 data_man_train.start_threads(sess)
@@ -98,14 +96,12 @@ if not os.path.exists(SAVE_DIR):
 try:
     print 'Starting training'
     step = 0
-    #start = time.time()
     while True:
         sess.run(optimizer, feed_dict={keep_prob: DROPOUT})
         if step % PRINT_EVERY == 0:
-            sess.run(tf.initialize_local_variables())
             loss, auc = sess.run([cost, auc_op], feed_dict={keep_prob: 1})
             print 'Step', step, 'Minibatch loss', loss, 'Minibatch AUC', auc
-        if step % EVAL_EVERY == 0:
+        if step % EVAL_EVERY == 0 and step != 0:
             sess.run(tf.initialize_local_variables())
             total_loss = 0
             for _ in range(len(val) / BATCH_SIZE):
