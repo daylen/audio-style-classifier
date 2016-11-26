@@ -16,6 +16,7 @@ BATCH_SIZE = 20
 LEARNING_RATE = 0.01
 PRINT_EVERY = 20
 EVAL_EVERY = 200
+SAVE_DIR = './checkpoints/'
 
 header, train, val, test, data_dict = get_data(N_CLASSES)
 
@@ -91,6 +92,9 @@ threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 data_man_train.start_threads(sess)
 data_man_val.start_threads(sess)
 
+if not os.path.exists(SAVE_DIR):
+    os.mkdir(SAVE_DIR)
+
 try:
     print 'Starting training'
     step = 0
@@ -108,7 +112,7 @@ try:
                 loss, auc = sess.run([cost_val, auc_op_val], feed_dict={keep_prob: 1})
                 total_loss += loss
             print 'Validation set loss', total_loss / (len(val) / BATCH_SIZE), 'Validation set AUC', auc
-            saver.save(sess, 'model', global_step=step)
+            saver.save(sess, SAVE_DIR + 'model', global_step=step)
         step += 1
 except:
     pass
