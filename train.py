@@ -9,7 +9,7 @@ SECONDS_OF_AUDIO = 3
 N_CLASSES = 50
 DROPOUT = 0.75
 BATCH_SIZE = 20
-LEARNING_RATE = 0.1
+LEARNING_RATE = 0.001
 PRINT_EVERY = 20
 EVAL_EVERY = 200
 SAVE_DIR = './checkpoints/'
@@ -48,20 +48,22 @@ def net(x, weights, biases, dropout):
     out = tf.add(tf.matmul(fc1, weights['out']), biases['out']) # (50)
     return out
 
+STD_DEV = 0.01
+
 weights = {
-    'w0': tf.Variable(tf.random_normal([200, 1, 128])),
-    'w1': tf.Variable(tf.random_normal([8, 128, 32])),
-    'w2': tf.Variable(tf.random_normal([8, 32, 32])),
-    'w3': tf.Variable(tf.random_normal([480, 100])),
-    'out': tf.Variable(tf.random_normal([100, N_CLASSES]))
+    'w0': tf.Variable(tf.random_normal([200, 1, 128], stddev=STD_DEV)),
+    'w1': tf.Variable(tf.random_normal([8, 128, 32], stddev=STD_DEV)),
+    'w2': tf.Variable(tf.random_normal([8, 32, 32], stddev=STD_DEV)),
+    'w3': tf.Variable(tf.random_normal([480, 100], stddev=STD_DEV)),
+    'out': tf.Variable(tf.random_normal([100, N_CLASSES], stddev=STD_DEV))
 }
 
 biases = {
-    'b0': tf.Variable(tf.random_normal([128])),
-    'b1': tf.Variable(tf.random_normal([32])),
-    'b2': tf.Variable(tf.random_normal([32])),
-    'b3': tf.Variable(tf.random_normal([100])),
-    'out': tf.Variable(tf.random_normal([N_CLASSES]))
+    'b0': tf.Variable(tf.random_normal([128], stddev=STD_DEV)),
+    'b1': tf.Variable(tf.random_normal([32], stddev=STD_DEV)),
+    'b2': tf.Variable(tf.random_normal([32], stddev=STD_DEV)),
+    'b3': tf.Variable(tf.random_normal([100], stddev=STD_DEV)),
+    'out': tf.Variable(tf.random_normal([N_CLASSES], stddev=STD_DEV))
 }
 
 
