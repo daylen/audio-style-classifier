@@ -1,23 +1,21 @@
-
-# coding: utf-8
-
-# In[1]:
-
 import librosa
 import csv
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 import os
-
-
-# In[2]:
+import time
 
 root_path = "/Users/daylenyang/Downloads/magnatagatune/mp3/"
 csv_file_path = root_path + "annotations_final.csv"
 
-
-# In[3]:
+SAMPLE_RATE = 16000
+SECONDS_OF_AUDIO = 3
+N_CLASSES = 50
+DROPOUT = 0.75
+BATCH_SIZE = 20
+LEARNING_RATE = 0.01
+MAX_STEPS = 300
 
 synonyms = [['beat', 'beats'],
             ['chant', 'chanting'],
@@ -49,23 +47,12 @@ synonyms = [['beat', 'beats'],
             ['vocal', 'vocals', 'voice', 'voices'],
             ['strange', 'weird']]
 
-
-# In[4]:
-
 def get_top_tags(k):
     df = pd.read_csv(csv_file_path, sep='\t')
     del df['mp3_path']
     del df['clip_id']
     sums = np.sum(df, axis=0)
     return map(lambda x: x[0], sorted(sums.iteritems(), key=lambda x: x[1])[::-1][:50])
-
-
-# In[5]:
-
-get_top_tags(50)
-
-
-# In[6]:
 
 def get_data_dict(N):
     """
@@ -85,25 +72,8 @@ def get_data_dict(N):
     return header, ret_val
 header, data_dict = get_data_dict(50)
 
-baby_set = data_dict.keys()[:50]
+baby_set = data_dict.keys()[:100]
 
-
-# In[7]:
-
-baby_set
-
-
-# # network definition
-
-# In[8]:
-
-SAMPLE_RATE = 16000
-SECONDS_OF_AUDIO = 3
-N_CLASSES = 50
-DROPOUT = 0.75
-
-
-# In[9]:
 
 def next_batch(batch_size):
     filenames = baby_set
@@ -114,7 +84,7 @@ def next_batch(batch_size):
     fname, value = reader.read(filename_queue)
     print fname, value
     
-    audio = np.flatten(librosa.load(fname, sr=SAMPLE_RATE)[0])
+    audio = librosa.load(fname, sr=SAMPLE_RATE)[0]
     print audio.shape
     audio = tf.random_crop(audio, SAMPLE_RATE * SECONDS_OF_AUDIO)
     label = data_dict[fname]
@@ -129,11 +99,9 @@ def next_batch(batch_size):
     
     return audios, labels
 
-
-# In[13]:
-
 curr_idx = 0
 def basic_next_batch(batch_size):
+    start = time.time()
     global curr_idx
     fnames = baby_set[curr_idx:curr_idx + batch_size]
     curr_idx += batch_size
@@ -142,27 +110,17 @@ def basic_next_batch(batch_size):
     audios, labels = [], []
     for fname in fnames:
         audio = librosa.load(fname, sr=SAMPLE_RATE)[0]
-#         print audio.shape
-#        audio = tf.constant(audio)
-        #print audio.get_shape()
-        #audio = tf.random_crop(audio, [SAMPLE_RATE * SECONDS_OF_AUDIO])
         rand_start_idx = np.random.randint(0, len(audio) - SAMPLE_RATE * SECONDS_OF_AUDIO)
         audio = audio[rand_start_idx:rand_start_idx + SAMPLE_RATE * SECONDS_OF_AUDIO]
         label = data_dict[fname]
         audios.append(audio)
         labels.append(label)
-        
-    
+
     audios, labels = np.array(audios), np.array(labels)
-    #print audios.shape
-    #print labels.shape
+    # print 'fetch took', time.time() - start
     return audios, labels
 
 
-# In[17]:
-
-BATCH_SIZE = 10
-LEARNING_RATE = 0.01
 x = tf.placeholder(tf.float32, [None, SAMPLE_RATE * SECONDS_OF_AUDIO])
 y = tf.placeholder(tf.float32, [None, N_CLASSES])
 keep_prob = tf.placeholder(tf.float32) # Dropout
@@ -170,7 +128,6 @@ keep_prob = tf.placeholder(tf.float32) # Dropout
 def conv1d(x, W, b, stride=1):
     x = tf.nn.conv1d(x, W, stride, padding='SAME')
     x = tf.nn.bias_add(x, b)
-    
     return tf.nn.relu(x)
 
 def maxpool1d(x, k=2):
@@ -218,24 +175,26 @@ optimizer = tf.train.AdamOptimizer(learning_rate=LEARNING_RATE).minimize(cost)
 init = tf.initialize_all_variables()
 
 print 'Starting training'
+saver = tf.train.Saver()
 sess = tf.Session()
-print 'init variables...'
 sess.run(init)
-print 'done with init'
 coord = tf.train.Coordinator()
 threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 try:
     step = 1
-    while step < 100:
-        #print step
+    start = time.time()
+    while step < MAX_STEPS:
         batch_x, batch_y = basic_next_batch(BATCH_SIZE)
-#         print tf.constant(batch_x).get_shape()
         sess.run(optimizer, feed_dict={x: batch_x, y: batch_y, keep_prob: DROPOUT})
         if step % 10 == 0:
+            print 'optim took', time.time() - start
+            start = time.time()
             loss = sess.run(cost, feed_dict={x: batch_x, y: batch_y, keep_prob: 1})
             print 'Step', step, 'Minibatch Loss', loss
         step += 1
     print 'Optimization done'
+    save_path = saver.save(sess, './model.ckpt')
+    print 'Saved to', save_path
     coord.request_stop()
 except tf.errors.OutOfRangeError:
     print 'done training'
@@ -245,8 +204,5 @@ finally:
 coord.join(threads)
 sess.close()
 
-
-# In[ ]:
-
-
-
+if __name__ == '__main__':
+    main()
