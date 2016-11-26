@@ -1,4 +1,4 @@
-
+import time
 import tensorflow as tf
 import os
 from data_manager import DataManager
@@ -96,11 +96,14 @@ if not os.path.exists(SAVE_DIR):
 try:
     print 'Starting training'
     step = 0
+    start = time.time()
     while True:
         sess.run(optimizer, feed_dict={keep_prob: DROPOUT})
         if step % PRINT_EVERY == 0:
             loss, auc = sess.run([cost, auc_op], feed_dict={keep_prob: 1})
-            print 'Step', step, 'Minibatch loss', loss, 'Minibatch AUC', auc
+            print 'Step', step, 'Epochs', float(step) * BATCH_SIZE / len(train), \
+                'Minibatch loss', loss, 'Minibatch AUC', auc, 'Time', time.time() - start
+            start = time.time()
         if step % EVAL_EVERY == 0 and step != 0:
             sess.run(tf.initialize_local_variables())
             total_loss = 0
