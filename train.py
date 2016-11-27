@@ -132,8 +132,8 @@ def train():
     coord.join(threads)
     sess.close()
 
-def evaluate(model, song_fname, start_in_seconds):
-    assert model != None and song_fname != None and start_in_seconds != None
+def evaluate(model, song_fname):
+    assert model != None and song_fname != None
     header, _, _, _, _ = get_data(N_CLASSES)
 
     weights, biases = get_vars()
@@ -144,13 +144,22 @@ def evaluate(model, song_fname, start_in_seconds):
     saver.restore(sess, model)
     pred = tf.sigmoid(net(x, weights, biases, keep_prob))
 
+    print 'Converting song to wav...'
     audio = librosa.load(song_fname, sr=SAMPLE_RATE)[0]
-    assert start_in_seconds * SAMPLE_RATE < len(audio)
-    audio = audio[start_in_seconds * SAMPLE_RATE:start_in_seconds * SAMPLE_RATE + SECONDS_OF_AUDIO * SAMPLE_RATE]
-    audio = np.array(audio)
-    audio = np.expand_dims(audio, 0)
+    probs = []
+    start_idx = 0
+    print 'Predicting...'
+    while start_idx + SECONDS_OF_AUDIO * SAMPLE_RATE < len(audio):
+        # print 100.0 * start_idx / len(audio), '%'
+        clip = audio[start_idx : start_idx + SECONDS_OF_AUDIO * SAMPLE_RATE]
+        clip = np.expand_dims(np.array(clip), 0)
+        result = sess.run(pred, feed_dict={x: clip, keep_prob: 1}).flatten()
+        probs.append(result)
+        start_idx += SECONDS_OF_AUDIO * SAMPLE_RATE
 
-    result = sess.run(pred, feed_dict={x: audio, keep_prob: 1}).flatten()
+    probs = np.array(probs)
+    result = probs.mean(axis=0)
+
     assert len(header) == len(result)
 
     tag_prob_list = []
@@ -168,12 +177,11 @@ def main():
     parser.add_argument('mode', choices=['train', 'eval'])
     parser.add_argument('--model')
     parser.add_argument('--song')
-    parser.add_argument('--start_pos', type=int)
     args = parser.parse_args()
     if args.mode == 'train':
         train()
     elif args.mode == 'eval':
-        evaluate(args.model, args.song, args.start_pos)
+        evaluate(args.model, args.song)
     else:
         raise Exception('invalid mode')
 
