@@ -16,7 +16,8 @@ LEARNING_RATE = 0.001
 PRINT_EVERY = 20
 EVAL_EVERY = 200
 STD_DEV = 0.01
-SAVE_DIR = './checkpoints3/'
+MERGE_TAGS = True
+SAVE_DIR = './checkpoints_merge/'
 
 x = tf.placeholder(tf.float32, [None, SAMPLE_RATE * SECONDS_OF_AUDIO])
 keep_prob = tf.placeholder(tf.float32) # Dropout
@@ -78,7 +79,7 @@ def get_vars():
     return weights, biases
 
 def train():
-    header, train, val, test, data_dict = get_data(N_CLASSES)
+    header, train, val, test, data_dict = get_data(N_CLASSES, MERGE_TAGS)
     print header
 
     weights, biases = get_vars()
@@ -134,7 +135,7 @@ def train():
 
 def evaluate(model, song_fname):
     assert model != None and song_fname != None
-    header, _, _, _, _ = get_data(N_CLASSES)
+    header, _, _, _, _ = get_data(N_CLASSES, MERGE_TAGS)
 
     weights, biases = get_vars()
 
@@ -150,7 +151,6 @@ def evaluate(model, song_fname):
     start_idx = 0
     print 'Predicting...'
     while start_idx + SECONDS_OF_AUDIO * SAMPLE_RATE < len(audio):
-        # print 100.0 * start_idx / len(audio), '%'
         clip = audio[start_idx : start_idx + SECONDS_OF_AUDIO * SAMPLE_RATE]
         clip = np.expand_dims(np.array(clip), 0)
         result = sess.run(pred, feed_dict={x: clip, keep_prob: 1}).flatten()

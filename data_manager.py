@@ -43,21 +43,30 @@ synonyms = [['beat', 'beats'],
             ['vocal', 'vocals', 'voice', 'voices'],
             ['strange', 'weird']]
 
-def _get_top_tags(N):
-    df = pd.read_csv(csv_file_path, sep='\t')
-    del df['mp3_path']
-    del df['clip_id']
-    sums = np.sum(df, axis=0)
+def _get_top_tags(df, N):
+    sums = np.sum(df[df.columns.difference(['mp3_path', 'clip_id'])], axis=0)
     return map(lambda x: x[0], sorted(sums.iteritems(), key=lambda x: x[1])[::-1][:N])
 
-def _get_data_dict(N):
+def _merge_tags(df):
+	print df.shape, 'pre-merge'
+	for arr in synonyms:
+		canonical = arr[0]
+		for syn in arr[1:]:
+			df[canonical] += df[syn]
+			df.drop(syn, axis=1, inplace=True)
+	print df.shape, 'post-merge'
+
+def _get_data_dict(N, merge=False):
     """
     header: an array of strings
     data_dict: a dictionary with filenames as keys and arrays of integers
     as values. The array contains the values corresponding to the header.
     """
     df = pd.read_csv(csv_file_path, sep='\t')
-    df_top_50 = df[_get_top_tags(N) + ['mp3_path']]
+    if merge:
+    	_merge_tags(df)
+    top_tags = _get_top_tags(df, N)
+    df_top_50 = df[top_tags + ['mp3_path']]
     df_dict = df_top_50.to_dict('split')
     header = df_dict['columns'][:-1]
     rows = df_dict['data']
@@ -84,8 +93,8 @@ def _get_train_val_test_fname_arrs(all_fnames):
 			raise Exception('Could not parse filename')
 	return train, val, test
 
-def get_data(N):
-	header, data_dict = _get_data_dict(N)
+def get_data(N, merge=False):
+	header, data_dict = _get_data_dict(N, merge=merge)
 	train, val, test = _get_train_val_test_fname_arrs(data_dict.keys())
 	random.shuffle(train)
 	random.shuffle(val)
