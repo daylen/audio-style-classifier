@@ -9,6 +9,8 @@ import os
 root_path = "/Users/daylenyang/Downloads/magnatagatune/mp3/"
 csv_file_path = root_path + "annotations_final.csv"
 
+percent_train = 0.95
+
 train_prefixes = set(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b'])
 val_prefixes = set(['c'])
 test_prefixes = set(['d', 'e', 'f'])
@@ -20,7 +22,7 @@ synonyms = [['beat', 'beats'],
             ['drum', 'drums'],
             ['electro', 'electronic', 'electronica', 'electric'],
             ['fast', 'fast beat', 'quick'],
-            ['female', 'female singer', 'female singing', 'female vocals', 'female voice', 'woman', 'woman singing', 'women'],
+            ['female', 'female singer', 'female singing', 'female vocals', 'female voice', 'woman', 'woman singing', 'women', 'female vocal'],
             ['flute', 'flutes'],
             ['guitar', 'guitars'],
             ['hard', 'hard rock'],
@@ -54,16 +56,18 @@ def _merge_tags(df):
 		for syn in arr[1:]:
 			df[canonical] += df[syn]
 			df.drop(syn, axis=1, inplace=True)
+	num = df._get_numeric_data()
+	num[num > 1] = 1
 	print df.shape, 'post-merge'
 
-def _get_data_dict(N, merge=False):
+def _get_data_dict(N, merge_tags):
     """
     header: an array of strings
     data_dict: a dictionary with filenames as keys and arrays of integers
     as values. The array contains the values corresponding to the header.
     """
     df = pd.read_csv(csv_file_path, sep='\t')
-    if merge:
+    if merge_tags:
     	_merge_tags(df)
     top_tags = _get_top_tags(df, N)
     df_top_50 = df[top_tags + ['mp3_path']]
@@ -77,25 +81,33 @@ def _get_data_dict(N, merge=False):
     return header, ret_val
 
 
-def _get_train_val_test_fname_arrs(all_fnames):
-	train = []
-	val = []
-	test = []
-	for fname in all_fnames:
-		char = fname[len(root_path):len(root_path)+1]
-		if char in train_prefixes:
-			train.append(fname)
-		elif char in val_prefixes:
-			val.append(fname)
-		elif char in test_prefixes:
-			test.append(fname)
-		else:
-			raise Exception('Could not parse filename')
-	return train, val, test
+def _get_train_val_test_fname_arrs(all_fnames, split_randomly):
+	if split_randomly:
+		# Does not return test array
+		all_fnames = sorted(all_fnames)
+		random.shuffle(all_fnames)
+		split_point = int(len(all_fnames) * percent_train)
+		return all_fnames[:split_point], all_fnames[split_point:], []
+	else:
+		train = []
+		val = []
+		test = []
+		for fname in all_fnames:
+			char = fname[len(root_path):len(root_path)+1]
+			if char in train_prefixes:
+				train.append(fname)
+			elif char in val_prefixes:
+				val.append(fname)
+			elif char in test_prefixes:
+				test.append(fname)
+			else:
+				raise Exception('Could not parse filename')
+		return train, val, test
 
-def get_data(N, merge=False):
-	header, data_dict = _get_data_dict(N, merge=merge)
-	train, val, test = _get_train_val_test_fname_arrs(data_dict.keys())
+def get_data(N, merge_tags=True, split_randomly=True):
+	random.seed(42)
+	header, data_dict = _get_data_dict(N, merge_tags)
+	train, val, test = _get_train_val_test_fname_arrs(data_dict.keys(), split_randomly)
 	random.shuffle(train)
 	random.shuffle(val)
 	random.shuffle(test)

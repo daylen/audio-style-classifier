@@ -14,9 +14,10 @@ DROPOUT = 0.75
 BATCH_SIZE = 20
 LEARNING_RATE = 0.001
 PRINT_EVERY = 20
-EVAL_EVERY = 200
+EVAL_EVERY = 500
 STD_DEV = 0.01
 MERGE_TAGS = True
+SPLIT_RANDOMLY = True
 SAVE_DIR = './checkpoints_merge/'
 
 x = tf.placeholder(tf.float32, [None, SAMPLE_RATE * SECONDS_OF_AUDIO])
@@ -79,7 +80,7 @@ def get_vars():
     return weights, biases
 
 def train():
-    header, train, val, test, data_dict = get_data(N_CLASSES, MERGE_TAGS)
+    header, train, val, test, data_dict = get_data(N_CLASSES, MERGE_TAGS, SPLIT_RANDOMLY)
     print header
 
     weights, biases = get_vars()
@@ -135,7 +136,7 @@ def train():
 
 def evaluate(model, song_fname):
     assert model != None and song_fname != None
-    header, _, _, _, _ = get_data(N_CLASSES, MERGE_TAGS)
+    header, _, _, _, _ = get_data(N_CLASSES, MERGE_TAGS, SPLIT_RANDOMLY)
 
     weights, biases = get_vars()
 
